@@ -3,7 +3,7 @@
 
 	モータ以外の実世界から情報を取得するモジュールを操作します
 	task.hも参照
-	*/
+*/
 #pragma once
 #include "task.h"
 #include "utils.h"
@@ -11,12 +11,12 @@
 #include <list>
 
 //MPL115A2からデータを取得するクラス
-//気圧の値はhPa単位で+-10hPaの誤差が存在
+//気圧の値はhPa単位で+-10hPaの誤差あり
 class PressureSensor : public TaskBase
 {
 private:
-	float mA0, mB1, mB2, mC12;//気圧計算用の係数
-	float mPressure, mTemperature;//最後に取得した気圧
+	float mA0,mB1,mB2,mC12;//気圧計算用の係数
+	int mPressure;//最後に取得した気圧
 	int mFileHandle;//winringPi i2c　のファイルハンドラ
 
 	struct timespec mLastUpdateRequest;//最後に気圧の更新をMPL115A2に指示した時刻
@@ -36,8 +36,7 @@ protected:
 	virtual bool onCommand(const std::vector<std::string>& args);
 public:
 	//最後にアップデートされた気圧を返す
-	float get() const;
-	float getTemperature() const;
+	int get();
 
 	PressureSensor();
 	~PressureSensor();
@@ -57,7 +56,8 @@ private:
 	bool mIsNewData;//新しい座標データがあれば真
 	bool mIsLogger;//真なら1秒ごとにgpsコマンドを実行
 
-	void showState() const;//補足した衛星数と座標を表示
+	void showState()const;//補足した衛星数と座標を表示
+	void sendState() ;//GPSを送信　８－７村上
 protected:
 	//GPSを初期化
 	virtual bool onInit(const struct timespec& time);
@@ -76,17 +76,16 @@ public:
 	//前回の座標取得以降にデータが更新された場合は真
 	bool isNewPos() const;
 	int getTime() const;
+	int getSatelites() const; //衛星数
 	float getCourse() const;
 	float getSpeed() const;
+	void setMIsLogger(bool logging); //mIsLoggerを切り替える testing入ったら呼び出す
 
 	GPSSensor();
 	~GPSSensor();
 };
 
 //L3GD20からデータを取得するクラス
-// X: to Left
-// Y: to Back
-// Z: to Top
 class GyroSensor : public TaskBase
 {
 private:
@@ -113,10 +112,10 @@ protected:
 	virtual bool onCommand(const std::vector<std::string>& args);
 public:
 	//最後にアップデートされたデータを返す
-	bool getRVel(VECTOR3& vel) const;
-	double getRvx() const;
-	double getRvy() const;
-	double getRvz() const;
+	bool getRVel(VECTOR3& vel);
+	double getRvx();
+	double getRvy();
+	double getRvz();
 
 	//////////////////////////////////////////////////
 	//角速度から計算された角度を処理する関数
@@ -125,10 +124,10 @@ public:
 	void setZero();
 
 	//現在の角度を返す(-180〜+180)
-	bool getRPos(VECTOR3& pos) const;
-	double getRx() const;
-	double getRy() const;
-	double getRz() const;
+	bool getRPos(VECTOR3& pos);
+	double getRx();
+	double getRy();
+	double getRz();
 
 	//ドリフト誤差を補正する(静止状態で呼び出すこと)
 	void calibrate();
@@ -142,15 +141,11 @@ public:
 };
 
 //MMA8451Qからデータを取得するクラス
-// X: to Back
-// Y: to Right
-// Z: to Top
 class AccelerationSensor : public TaskBase
 {
 private:
 	int mFileHandle;//winringPi i2c　のファイルハンドラ
-	VECTOR3 mAccel, mAccelAve;//加速度
-	double mAccelAlpha;//Coeff
+	VECTOR3 mAccel;//加速度
 protected:
 	virtual bool onInit(const struct timespec& time);
 	virtual void onClean();
@@ -158,16 +153,14 @@ protected:
 	virtual bool onCommand(const std::vector<std::string>& args);
 public:
 	//最後にアップデートされたデータを返す
-	bool getAccel(VECTOR3& acc) const;
-	double getAx() const;
-	double getAy() const;
-	double getAz() const;
+	bool getAccel(VECTOR3& acc);
+	double getAx();
+	double getAy();
+	double getAz();
 
-	double getTheta() const; //XY
-	double getPsi() const; //YZ
-	double getPhi() const; //XZ
-	
-	bool getRawAccel(VECTOR3& acc) const;
+	double getTheta(); //XY
+	double getPsi(); //YZ
+	double getPhi(); //XZ
 
 	AccelerationSensor();
 	~AccelerationSensor();
@@ -188,7 +181,7 @@ protected:
 
 public:
 	//現在の明るさを取得する
-	bool get() const;
+	bool get();
 
 	LightSensor();
 	~LightSensor();
@@ -233,22 +226,18 @@ public:
 	DistanceSensor();
 	~DistanceSensor();
 };
-/*
-//#include <opencv2/opencv.hpp>
+
+#include <opencv2/opencv.hpp>
 #include <opencv/cvaux.h>
 #include <opencv/highgui.h>
 class CameraCapture : public TaskBase
 {
 	CvCapture* mpCapture;
-	IplImage* mpResizedImage;
 	bool mIsWarming;
+	Filename mFilename;
 	unsigned int mCurVideoDeviceID;//現在使用しているカメラのデバイス番号(/dev/video*)
 
-	const static int WIDTH = 640, HEIGHT = 480;
-
-	std::string gpsfilename;
-	VECTOR3 vec;
-	int count;
+	const static int WIDTH = 320,HEIGHT = 240;
 protected:
 	virtual bool onInit(const struct timespec& time);
 	virtual void onClean();
@@ -258,22 +247,19 @@ protected:
 	void verifyCamera(bool reinitialize = true);
 public:
 	void startWarming();//getFrameする少し前に呼び出すこと.古い画像が取得されるのを防止できる
-	IplImage* getFrame(int width = 320, int height = 240);
+	IplImage* getFrame();
 
-	void save(const std::string* name = NULL, IplImage* pImage = NULL, bool nolog = false);
-	void wadatisave(const std::string* name = NULL, IplImage* pImage = NULL, bool nolog = false);
-	void write(const std::string& filename, const char* fmt, ...);
+	void save(const std::string* name = NULL,IplImage* pImage = NULL, bool nolog = false);
 
 	CameraCapture();
 	~CameraCapture();
 };
-*/
+
 extern GyroSensor gGyroSensor;
 extern GPSSensor gGPSSensor;
 extern PressureSensor gPressureSensor;
 extern LightSensor gLightSensor;
-//extern WebCamera gWebCamera;
+extern WebCamera gWebCamera;
 extern DistanceSensor gDistanceSensor;
-//extern CameraCapture gCameraCapture;
+extern CameraCapture gCameraCapture;
 extern AccelerationSensor gAccelerationSensor;
-
