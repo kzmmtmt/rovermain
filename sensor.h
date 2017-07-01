@@ -10,6 +10,65 @@
 #include <pthread.h>
 #include <list>
 
+class NineAxisSensor : public TaskBase
+{
+private:
+	int mFileHandle;
+	VECTOR3 mAccel, mAccelAve;
+	VECTOR3 mRVel, mRAngle;
+	VECTOR3 mMagnet;
+	struct timespec mLastSampleTime;
+	std::list<VECTOR3> mRVelHistory;
+	VECTOR3 mRVelOffset;
+	bool mIsCalculatingOffset;
+protected:
+	virtual bool onInit(const struct timespec& time);
+	virtual void onClean();
+	virtual void onUpdate(const struct timespec& time);
+	virtual bool onCommand(const std::vector<std::string>& args);
+public:
+	bool getAccel(VECTOR3& acc) const;
+	double getAx() const;
+	double getAy() const;
+	double getAz() const;
+
+	double getTheta() const; //XY
+	double getPsi() const; //YZ
+	double getPhi() const; //XZ
+
+	bool getRawAccel(VECTOR3& acc) const;
+	//最後にアップデートされたデータを返す
+	bool getRVel(VECTOR3& vel) const;
+	double getRvx() const;
+	double getRvy() const;
+	double getRvz() const;
+
+	//////////////////////////////////////////////////
+	//角速度から計算された角度を処理する関数
+
+	//現在の角度を基準とする
+	void setZero();
+
+	//現在の角度を返す(-180〜+180)
+	bool getRPos(VECTOR3& pos) const;
+	double getRx() const;
+	double getRy() const;
+	double getRz() const;
+
+	//ドリフト誤差を補正する(静止状態で呼び出すこと)
+	void calibrate();
+
+	//引数のベクトルを(-180〜+180)の範囲に修正
+	static void normalize(VECTOR3& pos);
+	static double normalize(double pos);
+
+	bool getMagnet(VECTOR3& mag);
+	double getMx() const;
+	double getMy() const;
+	double getMz() const;
+	NineAxisSensor();
+	~NineAxisSensor();
+}
 //MPL115A2からデータを取得するクラス
 //気圧の値はhPa単位で+-10hPaの誤差が存在
 class PressureSensor : public TaskBase
@@ -166,7 +225,7 @@ public:
 	double getTheta() const; //XY
 	double getPsi() const; //YZ
 	double getPhi() const; //XZ
-	
+
 	bool getRawAccel(VECTOR3& acc) const;
 
 	AccelerationSensor();
@@ -276,4 +335,3 @@ extern LightSensor gLightSensor;
 extern DistanceSensor gDistanceSensor;
 //extern CameraCapture gCameraCapture;
 extern AccelerationSensor gAccelerationSensor;
-

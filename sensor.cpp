@@ -24,6 +24,7 @@ LightSensor gLightSensor;
 DistanceSensor gDistanceSensor;
 //CameraCapture gCameraCapture;
 AccelerationSensor gAccelerationSensor;
+NineAxisSensor gNineAxisSensor;
 Filename gCaptureFilename = Filename("capture", ".png");
 
 //using namespace cv;
@@ -92,8 +93,46 @@ unsigned short wiringPiI2CReadReg16LE(int fd, int address)
 	return (unsigned short)((unsigned short)wiringPiI2CReadReg8(fd, address) | (unsigned short)wiringPiI2CReadReg8(fd, address + 1) << 8);
 }
 
+bool NineAxisSensor::onInit(const struct timespec& time)
+{
+	mRVel.x = mRVel.y = mRVel.z = 0;
+	mRAngle.x = mRAngle.y = mRAngle.z = 0;
+	memset(&mLastSampleTime, 0, sizeof(mLastSampleTime));
 
+	if ((mFileHandle = wiringPiI2CSetup(0b1101000))== -1)
+	{
+		Debug::print(LOG_SUMMARY,"Failed to setup NineAxis Sensor\r\n" );
+		return false;
+	}
+	if (wiringPiI2CReadReg8(mFileHandle, 0x75) != 0x71) {
+		close(mFileHandle);
+		Debug::print(LOG_SUMMARY, "Failed to verify NineAxis Sensor\r\n");
+		return false;
+	}
+	wiringPiI2CWriteReg8(mFileHandle, 0x6B, 0x00);
+	wiringPiI2CWriteReg8(mFileHandle, 0x37, 0x02);
+	wiringPiI2CWriteReg8(mFileHandle, 0x)
 
+}
+void NineAxisSensor::onClean()
+{
+	close(mFileHandle);
+}
+void NineAxisSensor::onUpdate(const struct timespec& time)
+{
+	VECTOR3 accel;
+	mAccel.x = 0.488 * (short)wiringPiI2CReadReg16BE(mFileHandle,0x3B);
+	mAccel.y = 0.488 * (short)wiringPiI2CReadReg16BE(mFileHandle,0x3D);
+	mAccel.z = 0.488 * (short)wiringPiI2CReadReg16BE(mFileHandle,0x3F);
+	mRVel.x = (short)wiringPiI2CReadReg16BE(mFileHandle,0x43);
+	mRVel.y = (short)wiringPiI2CReadReg16BE(mFileHandle,0x45);
+	mRVel.z = (short)wiringPiI2CReadReg16BE(mFileHandle,0x47);
+
+}
+void NineAxisSensor::onCommand(const std::vector<std::string>& args)
+{
+	Debug::print(LOG_SUMMARY,);
+}
 //////////////////////////////////////////////
 // Pressure Sensor
 //////////////////////////////////////////////
